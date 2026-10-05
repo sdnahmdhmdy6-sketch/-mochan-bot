@@ -11,7 +11,7 @@ const lineConfig = {
 const lineClient = new Client(lineConfig);
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-3.8-flash";
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
 async function askGemini(message) {
   const url =
@@ -26,20 +26,34 @@ async function askGemini(message) {
       systemInstruction: {
         parts: [
           {
-            text:
-              "أنت Mochan، بوت سعودي في قروب سوالف وضحك. " +
-              "رد باللهجة السعودية بشكل طبيعي وسريع. " +
-              "كن مضحك وطقطق وكن فضولي شوي بدون تجريح أو إساءة. " +
-              "افهم سياق الكلام ولا تكرر نفس الردود كثير. " +
-              "تصرف كأنك عضو حقيقي في القروب. " +
-              "لا تقول إنك ذكاء اصطناعي إلا إذا سُئلت مباشرة.",
+            text: `
+أنت Mochan، عضو سعودي في قروب "سوالف وضحك".
+
+شخصيتك:
+- سعودي وتتكلم باللهجة السعودية الطبيعية.
+- مضحك وخفيف دم وسريع بديهة.
+- طقطقتك قوية لكن بدون إهانة أو تنمر مؤذي.
+- فضولي وتدخل في السوالف كأنك عضو حقيقي.
+- افهم سياق الكلام ولا ترد بردود روبوتية.
+- لا تكرر نفس الردود.
+- إذا أحد يطقطق عليك، طقطق عليه برد ذكي.
+- إذا أحد قال هلا، رد بطريقة مختلفة ومضحكة.
+- لا تشرح أنك ذكاء اصطناعي إلا إذا سألوك مباشرة.
+- خلي ردودك قصيرة غالبًا، من جملة إلى ثلاث جمل.
+- لا تستخدم أسلوب رسمي.
+            `,
           },
         ],
       },
+
       contents: [
         {
           role: "user",
-          parts: [{ text: message }],
+          parts: [
+            {
+              text: message,
+            },
+          ],
         },
       ],
     }),
@@ -49,15 +63,16 @@ async function askGemini(message) {
 
   if (!response.ok) {
     console.error("GEMINI ERROR:", JSON.stringify(data));
-    throw new Error("Gemini API error");
+    throw new Error(`Gemini API error: ${response.status}`);
   }
 
-  return (
+  const reply =
     data.candidates?.[0]?.content?.parts
       ?.map((part) => part.text || "")
       .join("")
-      .trim() || "وش ذا الكلام؟ 😂"
-  );
+      .trim();
+
+  return reply || "مدري وش أقول بس كملوا السالفة 😂";
 }
 
 app.post("/webhook", middleware(lineConfig), async (req, res) => {
@@ -66,14 +81,15 @@ app.post("/webhook", middleware(lineConfig), async (req, res) => {
   res.status(200).end();
 
   for (const event of req.body.events || []) {
-    if (event.type !== "message" || event.message.type !== "text") {
-      continue;
-    }
+    if (event.type !== "message") continue;
+    if (event.message.type !== "text") continue;
 
     try {
-      console.log("MESSAGE:", event.message.text);
+      const message = event.message.text;
 
-      const reply = await askGemini(event.message.text);
+      console.log("MESSAGE:", message);
+
+      const reply = await askGemini(message);
 
       console.log("GEMINI RESPONSE:", reply);
 

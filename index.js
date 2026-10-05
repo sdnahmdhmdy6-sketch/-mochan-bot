@@ -11,7 +11,7 @@ const lineConfig = {
 const lineClient = new Client(lineConfig);
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 async function askGemini(message) {
   const url =
@@ -24,39 +24,29 @@ async function askGemini(message) {
     },
     body: JSON.stringify({
       systemInstruction: {
-        parts: [
-          {
-            text: `
-أنت Mochan، عضو سعودي في قروب "سوالف وضحك".
+        parts: [{
+          text: `
+أنت Mochan، عضو في قروب "سوالف وضحك".
 
 شخصيتك:
 - سعودي وتتكلم باللهجة السعودية الطبيعية.
 - مضحك وخفيف دم وسريع بديهة.
-- طقطقتك قوية لكن بدون إهانة أو تنمر مؤذي.
-- فضولي وتدخل في السوالف كأنك عضو حقيقي.
-- افهم سياق الكلام ولا ترد بردود روبوتية.
-- لا تكرر نفس الردود.
-- إذا أحد يطقطق عليك، طقطق عليه برد ذكي.
-- إذا أحد قال هلا، رد بطريقة مختلفة ومضحكة.
-- لا تشرح أنك ذكاء اصطناعي إلا إذا سألوك مباشرة.
-- خلي ردودك قصيرة غالبًا، من جملة إلى ثلاث جمل.
-- لا تستخدم أسلوب رسمي.
-            `,
-          },
-        ],
+- طقطق بدون تجريح أو إساءة قوية.
+- تدخل في السوالف كأنك واحد من أعضاء القروب.
+- افهم الكلام والسياق.
+- لا تكرر نفس الردود كثير.
+- إذا أحد طقطق عليك، رد عليه بطقطقة ذكية.
+- ردودك قصيرة وطبيعية، غالبًا من جملة إلى ثلاث جمل.
+- لا تتكلم بأسلوب رسمي أو روبوتي.
+- لا تقول إنك ذكاء اصطناعي إلا إذا سألوك.
+          `
+        }]
       },
-
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: message,
-            },
-          ],
-        },
-      ],
-    }),
+      contents: [{
+        role: "user",
+        parts: [{ text: message }]
+      }]
+    })
   });
 
   const data = await response.json();
@@ -68,11 +58,11 @@ async function askGemini(message) {
 
   const reply =
     data.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text || "")
+      ?.map(part => part.text || "")
       .join("")
       .trim();
 
-  return reply || "مدري وش أقول بس كملوا السالفة 😂";
+  return reply || "هاه؟ عيدها ما سمعتك 😂";
 }
 
 app.post("/webhook", middleware(lineConfig), async (req, res) => {
@@ -85,20 +75,19 @@ app.post("/webhook", middleware(lineConfig), async (req, res) => {
     if (event.message.type !== "text") continue;
 
     try {
-      const message = event.message.text;
+      console.log("MESSAGE:", event.message.text);
 
-      console.log("MESSAGE:", message);
-
-      const reply = await askGemini(message);
+      const reply = await askGemini(event.message.text);
 
       console.log("GEMINI RESPONSE:", reply);
 
       await lineClient.replyMessage(event.replyToken, {
         type: "text",
-        text: reply.slice(0, 5000),
+        text: reply.slice(0, 5000)
       });
 
       console.log("REPLY SENT");
+
     } catch (error) {
       console.error("BOT ERROR:", error);
     }

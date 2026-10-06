@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 // =========================
-// ENV CHECK
+// ENVIRONMENT
 // =========================
 
 const ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim();
@@ -61,13 +61,22 @@ const pool = new Pool({
 
 // =========================
 // ADMINS
+// كل أدمن في خانة مستقلة:
+// MOCHAN_ADMIN_1
+// MOCHAN_ADMIN_2
+// MOCHAN_ADMIN_3
+// ...إلخ
 // =========================
 
 const ADMIN_USER_IDS = new Set(
-  (process.env.MOCHAN_ADMIN_IDS || "")
-    .split(",")
-    .map(id => id.trim())
+  Object.keys(process.env)
+    .filter(key => /^MOCHAN_ADMIN_\d+$/.test(key))
+    .map(key => process.env[key]?.trim())
     .filter(Boolean)
+);
+
+console.log(
+  `👑 Admins loaded: ${ADMIN_USER_IDS.size}`
 );
 
 function isAdmin(userId) {
@@ -115,7 +124,7 @@ async function initDatabase() {
 }
 
 // =========================
-// GROUP FUNCTIONS
+// GROUP
 // =========================
 
 async function getGroup(groupId) {
@@ -207,7 +216,7 @@ async function getLineDisplayName(groupId, userId) {
 }
 
 // =========================
-// MESSAGES MEMORY
+// MESSAGES
 // =========================
 
 async function saveMessage(
@@ -263,7 +272,8 @@ async function getRecentMessages(groupId) {
 
 const openai = new OpenAI({
   apiKey: GEMINI_API_KEY,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  baseURL:
+    "https://generativelanguage.googleapis.com/v1beta/openai/"
 });
 
 async function askMochan(
@@ -282,11 +292,13 @@ async function askMochan(
 أنت موشان، عضو حقيقي في قروب سعودي اسمه "سوالف وضحك".
 
 تكلم باللهجة السعودية بشكل طبيعي جدًا.
-لا تتكلم كأنك روبوت أو مساعد ذكي.
+كن عفوي وخفيف دم.
+لا تتكلم كأنك روبوت.
 لا تقل إنك ذكاء اصطناعي إلا إذا سُئلت بشكل مباشر.
-كن عفويًا، خفيف دم، وتفاعل مع السالفة.
-استخدم اسم الشخص أحيانًا بشكل طبيعي، ولا تكرره في كل رسالة.
-لا تكتب ردود طويلة بدون سبب.
+تفاعل مع السالفة الحالية.
+استخدم اسم الشخص أحيانًا بشكل طبيعي.
+لا تكرر الاسم في كل رسالة.
+لا تطول في الرد بدون سبب.
 
 اسم الشخص:
 ${displayName}
@@ -343,12 +355,18 @@ app.post(
       const events = req.body.events || [];
 
       for (const event of events) {
+        // =========================
+        // JOIN
+        // =========================
+
         if (event.type === "join") {
-          console.log(
-            "👋 Mochan joined a group."
-          );
+          console.log("👋 Mochan joined a group.");
           continue;
         }
+
+        // =========================
+        // TEXT ONLY
+        // =========================
 
         if (
           event.type !== "message" ||
@@ -374,13 +392,11 @@ app.post(
           );
 
         // =========================
-        // ID COMMAND
+        // ID
         // =========================
 
         if (text === "موشان هويتي") {
-          console.log(
-            `👤 USER ID: ${userId}`
-          );
+          console.log(`👤 USER ID: ${userId}`);
 
           await replyMessage(
             event.replyToken,
@@ -395,20 +411,20 @@ app.post(
         // =========================
 
         if (text === "موشان من أنا") {
-          const adminText = isAdmin(userId)
+          const reply = isAdmin(userId)
             ? "أنت من الإداريين عندي 👑"
             : "أنت عضو بالقروب، وأموري معك طيبة 😂";
 
           await replyMessage(
             event.replyToken,
-            adminText
+            reply
           );
 
           continue;
         }
 
         // =========================
-        // APPROVE
+        // APPROVE GROUP
         // =========================
 
         if (
@@ -420,6 +436,7 @@ app.post(
               event.replyToken,
               "ما عندك صلاحية تعتمد القروب."
             );
+
             continue;
           }
 
@@ -449,6 +466,7 @@ app.post(
               event.replyToken,
               "ما عندك صلاحية."
             );
+
             continue;
           }
 
@@ -475,6 +493,7 @@ app.post(
               event.replyToken,
               "ما عندك صلاحية تطلعني 😂"
             );
+
             continue;
           }
 
@@ -486,9 +505,7 @@ app.post(
           );
 
           try {
-            await lineClient.leaveGroup(
-              groupId
-            );
+            await lineClient.leaveGroup(groupId);
           } catch (error) {
             console.error(
               "❌ Leave group error:",
@@ -512,25 +529,22 @@ app.post(
               event.replyToken,
               "ما عندك صلاحية تسكتني 😂"
             );
+
             continue;
           }
 
-          const group = await getGroup(
-            groupId
-          );
+          const group = await getGroup(groupId);
 
           if (!group?.approved) {
             await replyMessage(
               event.replyToken,
               "القروب مو معتمد عندي."
             );
+
             continue;
           }
 
-          await setMuted(
-            groupId,
-            true
-          );
+          await setMuted(groupId, true);
 
           await replyMessage(
             event.replyToken,
@@ -553,25 +567,22 @@ app.post(
               event.replyToken,
               "ما عندك صلاحية."
             );
+
             continue;
           }
 
-          const group = await getGroup(
-            groupId
-          );
+          const group = await getGroup(groupId);
 
           if (!group?.approved) {
             await replyMessage(
               event.replyToken,
               "القروب مو معتمد عندي."
             );
+
             continue;
           }
 
-          await setMuted(
-            groupId,
-            false
-          );
+          await setMuted(groupId, false);
 
           await replyMessage(
             event.replyToken,
@@ -582,12 +593,10 @@ app.post(
         }
 
         // =========================
-        // GROUP STATUS
+        // CHECK APPROVAL
         // =========================
 
-        const group = await getGroup(
-          groupId
-        );
+        const group = await getGroup(groupId);
 
         if (!group?.approved) {
           continue;
@@ -623,12 +632,10 @@ app.post(
         // =========================
 
         const recentMessages =
-          await getRecentMessages(
-            groupId
-          );
+          await getRecentMessages(groupId);
 
         // =========================
-        // AI REPLY
+        // AI RESPONSE
         // =========================
 
         try {
@@ -669,7 +676,7 @@ app.post(
 );
 
 // =========================
-// HEALTH CHECK
+// HOME
 // =========================
 
 app.get("/", (req, res) => {

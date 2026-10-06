@@ -13,6 +13,28 @@ const lineClient = new Client(lineConfig);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
+// ===============================
+// 👑 الأدمن
+// ===============================
+
+const ADMIN_USER_IDS = new Set(
+  (process.env.MOCHAN_ADMIN_IDS || "")
+    .split(",")
+    .map(id => id.trim())
+    .filter(Boolean)
+);
+
+// القروبات اللي موشان ساكت فيها
+const mutedGroups = new Set();
+
+function isAdmin(userId) {
+  return userId && ADMIN_USER_IDS.has(userId);
+}
+
+// ===============================
+// 🤖 Gemini
+// ===============================
+
 async function askGemini(message) {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -22,40 +44,65 @@ async function askGemini(message) {
     headers: {
       "Content-Type": "application/json",
     },
+
     body: JSON.stringify({
       systemInstruction: {
-        parts: [{
-          text: `
+        parts: [
+          {
+            text: `
 أنت Mochan، شخص حقيقي وعضو في قروب "سوالف وضحك".
 
-أسلوبك:
+شخصيتك:
 - تكلم باللهجة السعودية العامية فقط.
-- لا تستخدم الفصحى أبدًا إلا إذا اضطررت.
-- تكلم بشكل عفوي جدًا، كأنك شخص يسولف بالجوال.
-- رد على الشخص اللي أرسل الرسالة مباشرة.
-- استخدم "أنت" أو "إنت" أو "إنتِ" حسب سياق الكلام.
-- لا تتكلم بصيغة جماعية مثل "يا جماعة" أو "أنتم" إلا إذا الكلام فعلًا موجه للجميع.
+- لا تستخدم الفصحى.
+- خلك عفوي جدًا وكأنك شخص حقيقي ماسك جواله ويسولف.
+- رد على الشخص نفسه مباشرة، لا تتكلم بصيغة جماعية.
+- لا تقول "يا جماعة" إلا إذا الكلام فعلًا موجه للجميع.
 - لا تبدأ كل رد بنفس الطريقة.
-- لا تكرر نفس النكت أو العبارات.
-- خلك سريع بديهة وفضولي وتحب تدخل بالسوالف.
-- إذا الشخص قال شيء يضحك، طقطق عليه.
-- إذا الشخص يشتكي، تفاعل معه بشكل طبيعي.
-- إذا الشخص يسأل، جاوبه بشكل واضح ومختصر.
-- إذا أحد طقطق عليك، لا تزعل، رد بطقطقة أقوى.
-- لا تكون رسمي ولا تستخدم أسلوب روبوت.
-- لا تقول "بصفتي ذكاء اصطناعي" أو أي كلام مشابه إلا إذا سألوك بشكل مباشر.
+- لا تكرر نفس النكت أو الردود.
+- لا تكون رسمي أبدًا.
+- لا تقول إنك ذكاء اصطناعي إلا إذا سألوك بشكل مباشر.
 - لا تكثر إيموجيات.
-- رد غالبًا بجملة أو جملتين، وأحيانًا أكثر إذا السالفة تحتاج.
-- لا تستخدم علامات أو تنسيق غريب.
-- أهم شيء: خلك طبيعي وكأنك واحد من القروب.
-          `
-        }]
+
+الترحيب:
+- إذا شخص قال هلا أو السلام عليكم أو صباح الخير أو دخل يسولف، رحب فيه بطريقة عفوية ومضحكة.
+- نوّع الترحيبات.
+- إذا شخص جديد بالقروب، رحب فيه وكأنك تعرفه من زمان.
+- لا تستخدم نفس الترحيب كل مرة.
+
+النكت والطقطقة:
+- عط نكت قصيرة من وقت لوقت.
+- إذا أحد قال شيء يضحك، طقطق عليه.
+- إذا أحد طقطق عليك، رد عليه بطقطقة أقوى.
+- إذا أحد قال شيء غريب أو محرج، استغل الموقف بالطقطقة الخفيفة.
+- لا تكون ثقيل أو جارح.
+- لا تجعل كل رد نكتة؛ خلي كلامك طبيعي.
+
+السوالف:
+- إذا أحد فتح موضوع، ادخل معه بالسوالف.
+- اسأله أسئلة أحيانًا عشان تستمر السالفة.
+- خلك فضولي ولقاف بشكل مضحك.
+- إذا أحد يشتكي، تفاعل معه طبيعي.
+- إذا أحد يسأل سؤال، جاوبه بوضوح وباختصار.
+- إذا الكلام يحتاج شرح، اشرح بشكل بسيط.
+
+أهم شيء:
+خلك واحد من القروب، سريع بديهة، لقاف، مضحك، وتلقط السالفة بسرعة.
+`
+          }
+        ]
       },
 
-      contents: [{
-        role: "user",
-        parts: [{ text: message }]
-      }]
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: message
+            }
+          ]
+        }
+      ]
     })
   });
 
@@ -75,40 +122,283 @@ async function askGemini(message) {
   return reply || "وش تقول إنت 😂";
 }
 
-app.post("/webhook", middleware(lineConfig), async (req, res) => {
-  console.log("LINE EVENT RECEIVED:", JSON.stringify(req.body));
+// ===============================
+// 🚪 خروج من القروب
+// ===============================
 
-  res.status(200).end();
+async function leaveGroup(groupId) {
+  const response = await fetch(
+    `https://api.line.me/v2/bot/group/${encodeURIComponent(groupId)}/leave`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lineConfig.channelAccessToken}`,
+      },
+    }
+  );
 
-  for (const event of req.body.events || []) {
-    if (event.type !== "message") continue;
-    if (event.message.type !== "text") continue;
+  if (!response.ok) {
+    const errorText = await response.text();
 
-    try {
-      const message = event.message.text;
+    throw new Error(
+      `LINE LEAVE ERROR ${response.status}: ${errorText}`
+    );
+  }
 
-      console.log("MESSAGE:", message);
+  console.log("MOCHAN LEFT GROUP:", groupId);
+}
 
-      const reply = await askGemini(message);
+// ===============================
+// 💬 Webhook
+// ===============================
 
-      console.log("GEMINI RESPONSE:", reply);
+app.post(
+  "/webhook",
+  middleware(lineConfig),
+  async (req, res) => {
 
-      await lineClient.replyMessage(event.replyToken, {
-        type: "text",
-        text: reply.slice(0, 5000)
-      });
+    console.log(
+      "LINE EVENT RECEIVED:",
+      JSON.stringify(req.body)
+    );
 
-      console.log("REPLY SENT");
+    res.status(200).end();
 
-    } catch (error) {
-      console.error("BOT ERROR:", error);
+    for (const event of req.body.events || []) {
+
+      if (event.type !== "message") continue;
+      if (event.message?.type !== "text") continue;
+
+      try {
+
+        const message = event.message.text.trim();
+
+        const userId = event.source?.userId;
+        const sourceType = event.source?.type;
+        const groupId = event.source?.groupId;
+
+        const normalized = message
+          .replace(/\s+/g, " ")
+          .trim();
+
+        console.log("MESSAGE:", message);
+        console.log("USER ID:", userId);
+
+        // =========================================
+        // 🆔 معرفة ID المستخدم
+        // =========================================
+
+        if (normalized === "موشان هويتي") {
+
+          console.log("================================");
+          console.log("MOCHAN USER ID:", userId);
+          console.log("SOURCE TYPE:", sourceType);
+          console.log("================================");
+
+          await lineClient.replyMessage(
+            event.replyToken,
+            {
+              type: "text",
+              text: "تم 😂 شيكي Render Logs، ما راح أطلع الآيدي بالقروب."
+            }
+          );
+
+          continue;
+        }
+
+        // =========================================
+        // 👑 معرفة هل الشخص أدمن
+        // =========================================
+
+        if (normalized === "موشان من أنا") {
+
+          const reply = isAdmin(userId)
+            ? "إيه إيه، أنتِ من الإدارة 👑 لا تستغلين السلطة بس 😂"
+            : "أنتِ عضو عادي يا بعدي 😂 لا تحاولين تصيرين مديرة.";
+
+          await lineClient.replyMessage(
+            event.replyToken,
+            {
+              type: "text",
+              text: reply
+            }
+          );
+
+          continue;
+        }
+
+        // =========================================
+        // 🚪 موشان اطلع
+        // =========================================
+
+        if (
+          normalized === "موشان اطلع" ||
+          normalized === "موشان اطلع من القروب"
+        ) {
+
+          if (!isAdmin(userId)) {
+
+            await lineClient.replyMessage(
+              event.replyToken,
+              {
+                type: "text",
+                text: "هههههههه على كيفك؟ أنت مو من الإدارة 😂"
+              }
+            );
+
+            continue;
+          }
+
+          if (sourceType !== "group" || !groupId) {
+
+            await lineClient.replyMessage(
+              event.replyToken,
+              {
+                type: "text",
+                text: "ما أقدر أطلع من هنا، الأمر هذا للقروبات بس 😂"
+              }
+            );
+
+            continue;
+          }
+
+          await lineClient.replyMessage(
+            event.replyToken,
+            {
+              type: "text",
+              text: "تم، بسحب نفسي قبل لا أندم 😂"
+            }
+          );
+
+          await leaveGroup(groupId);
+
+          continue;
+        }
+
+        // =========================================
+        // 🤐 موشان اسكت
+        // =========================================
+
+        if (
+          normalized === "موشان اسكت" ||
+          normalized === "موشان وضع هدوء"
+        ) {
+
+          if (!isAdmin(userId)) {
+
+            await lineClient.replyMessage(
+              event.replyToken,
+              {
+                type: "text",
+                text: "لا تأمرني يا حبيبي 😂"
+              }
+            );
+
+            continue;
+          }
+
+          if (!groupId) continue;
+
+          mutedGroups.add(groupId);
+
+          await lineClient.replyMessage(
+            event.replyToken,
+            {
+              type: "text",
+              text: "تم، بسكت 🤐 وإذا سمعتوا صوتي اعتبروني أهوجس."
+            }
+          );
+
+          continue;
+        }
+
+        // =========================================
+        // 🗣️ موشان تكلم
+        // =========================================
+
+        if (
+          normalized === "موشان تكلم" ||
+          normalized === "موشان وضع سوالف"
+        ) {
+
+          if (!isAdmin(userId)) {
+
+            await lineClient.replyMessage(
+              event.replyToken,
+              {
+                type: "text",
+                text: "وأنت وش دخلك؟ 😂"
+              }
+            );
+
+            continue;
+          }
+
+          if (!groupId) continue;
+
+          mutedGroups.delete(groupId);
+
+          await lineClient.replyMessage(
+            event.replyToken,
+            {
+              type: "text",
+              text: "رجعتتت 😂 يلا وش السالفة؟"
+            }
+          );
+
+          continue;
+        }
+
+        // =========================================
+        // 🤐 إذا القروب مكتوم
+        // =========================================
+
+        if (
+          sourceType === "group" &&
+          groupId &&
+          mutedGroups.has(groupId)
+        ) {
+          continue;
+        }
+
+        // =========================================
+        // 🤖 الرد الطبيعي
+        // =========================================
+
+        const reply = await askGemini(message);
+
+        console.log("GEMINI RESPONSE:", reply);
+
+        await lineClient.replyMessage(
+          event.replyToken,
+          {
+            type: "text",
+            text: reply.slice(0, 5000)
+          }
+        );
+
+        console.log("REPLY SENT");
+
+      } catch (error) {
+
+        console.error("BOT ERROR:", error);
+
+      }
     }
   }
-});
+);
+
+// ===============================
+// 🏠 الصفحة الرئيسية
+// ===============================
 
 app.get("/", (req, res) => {
   res.send("Mochan is running 🤖");
 });
+
+// ===============================
+// 🚀 تشغيل السيرفر
+// ===============================
 
 const PORT = process.env.PORT || 3000;
 
